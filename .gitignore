@@ -1,0 +1,7 @@
+/Firmware/.vs/StMon/v14/*.suo
+/Firmware/.vs/co2Mon/v14/*.suo
+*.lck
+StMon-Debug-Win32.0001
+/Firmware/CodeDB/StMon-Debug-Win32
+/Firmware/Debug
+/Firmware/*.old
