@@ -6,8 +6,8 @@ BINARYDIR := Debug
 
 #Additional flags
 PREPROCESSOR_MACROS := DEBUG=1
-INCLUDE_DIRS := src/freertos/include src/freertos/portable src src/usb
-LIBRARY_DIRS := src/freertos/portable src src/usb
+INCLUDE_DIRS := src/freertos/include src/freertos/portable
+LIBRARY_DIRS := src/freertos/portable src
 LIBRARY_NAMES := 
 ADDITIONAL_LINKER_INPUTS := 
 MACOS_FRAMEWORKS := 

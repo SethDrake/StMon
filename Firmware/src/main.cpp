@@ -19,10 +19,14 @@ I2C_HandleTypeDef i2c;
 /*SSD1306 display;*/
 
 SYSTEM_MODE systemMode;
-
+bool gsmIsActive;
 
 osThreadId statusTaskHandle;
 osThreadId listenModemTaskHandle;
+
+void switchSystemMode(SYSTEM_MODE mode);
+
+void switchGSM(bool enable);
 
 void errorHandler(void);
 
@@ -91,10 +95,9 @@ void RCC_Configuration()
 	__HAL_RCC_PWR_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
-	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_I2C1_CLK_ENABLE();
 	__HAL_RCC_DMA1_CLK_ENABLE();
-	__HAL_RCC_USART1_CLK_ENABLE();
+	__HAL_RCC_USART2_CLK_ENABLE();
 	__HAL_RCC_AFIO_CLK_ENABLE();
 }
 
@@ -119,7 +122,7 @@ void I2C_Configuration(I2C_HandleTypeDef* i2cHandle)
 void USART_Configuration(UART_HandleTypeDef* usartHandle)
 {
 	usartHandle->Instance			= USART2;
-	usartHandle->Init.BaudRate		= 56000;
+	usartHandle->Init.BaudRate		= 115200;
 	usartHandle->Init.WordLength	= UART_WORDLENGTH_8B;
 	usartHandle->Init.StopBits		= UART_STOPBITS_1;
 	usartHandle->Init.Parity		= UART_PARITY_NONE;
@@ -158,7 +161,7 @@ void GPIO_Configuration(void)
 	GPIO_InitStruct.Pin = I2C_SCL | I2C_SDA;
 	HAL_GPIO_Init(I2C_PORT, &GPIO_InitStruct);
 
-		/* USART1 PINS */
+		/* USART2 PINS */
 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 	GPIO_InitStruct.Pin = USART_RX | USART_TX;
@@ -170,6 +173,12 @@ void GPIO_Configuration(void)
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	GPIO_InitStruct.Pin = LED_STAT_PIN | LED_AIR_PIN;
 	HAL_GPIO_Init(LEDS_PORT, &GPIO_InitStruct);
+	
+	/* Configure GSM PWR pins */
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	GPIO_InitStruct.Pin = GSM_PWR_PIN;
+	HAL_GPIO_Init(GSM_PWR_PORT, &GPIO_InitStruct);
 
 	__HAL_AFIO_REMAP_SWJ_NOJTAG(); //disable JTAG
 }
@@ -209,13 +218,41 @@ void switchSystemMode(SYSTEM_MODE mode)
 	{
 		return;	
 	}
-	if (mode == SLEEP)
+	systemMode = mode;
+	if (mode == ACTIVE)
 	{
-		systemMode = SLEEP;
+		//enable GSM module
+		switchGSM(true);
 	}
-	else
+	else if(mode == IDLE)
 	{
-		systemMode = ACTIVE;
+		//disable GSM module
+		switchGSM(true);
+	}
+	else if(mode == SLEEP)
+	{
+		//sleep controller
+	}
+}
+
+void switchGSM(bool enable)
+{
+	if (gsmIsActive == enable)
+	{
+		return;
+	}
+	gsmIsActive = enable;
+	if (gsmIsActive)
+	{
+		//switch on gsm
+		HAL_GPIO_WritePin(GSM_PWR_PORT, GSM_PWR_PIN, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(LEDS_PORT, LED_AIR_PIN, GPIO_PIN_SET);
+	}
+	else 
+	{
+		//switch off gsm
+		HAL_GPIO_WritePin(GSM_PWR_PORT, GSM_PWR_PIN, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LEDS_PORT, LED_AIR_PIN, GPIO_PIN_RESET);
 	}
 }
 
@@ -227,23 +264,35 @@ void statusTask(void const * argument)
 		if (systemMode == LOADING)
 		{
 			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_SET);
-			osDelay(3000);
+			osDelay(2000);
 			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_RESET);
+			osDelay(100);
+			HAL_GPIO_WritePin(LEDS_PORT, LED_AIR_PIN, GPIO_PIN_SET);
+			osDelay(200);
+			HAL_GPIO_WritePin(LEDS_PORT, LED_AIR_PIN, GPIO_PIN_RESET);
+			osDelay(150);
 		}
-		else if (systemMode == ACTIVE)
-		{
-			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_SET);
-			osDelay(500);
-			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_RESET);
-		}
-		else if (systemMode == SLEEP)
+		else if (systemMode == IDLE)
 		{
 			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_SET);
 			osDelay(1500);
 			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_RESET);
 			osDelay(3000);
 		}
-		osDelay(2000);
+		else if (systemMode == ACTIVE)
+		{
+			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_SET);
+			osDelay(500);
+			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_RESET);
+			osDelay(500);
+		}
+		else if (systemMode == SLEEP)
+		{
+			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_SET);
+			osDelay(500);
+			HAL_GPIO_WritePin(LEDS_PORT, LED_STAT_PIN, GPIO_PIN_RESET);
+			osDelay(10000);
+		}
 	}
 }
 
@@ -251,13 +300,12 @@ void listenModemTask(void const * argument)
 {
 	while (true)
 	{
-		if (systemMode == LOADING)
+		if (systemMode == IDLE)
 		{
-			osDelay(350);
-			return;
+			switchSystemMode(ACTIVE); //enable gsm
+			
 		}
-
-		osDelay(500);
+		osDelay(60000);
 	}
 }
 
@@ -285,16 +333,16 @@ int main()
 	display.printf(12, 15, ".... LOADING ....");
 	display.drawFramebuffer();*/
 
-	osThreadDef(statusThread, statusTask, osPriorityNormal, 0, 256);
+	osThreadDef(statusThread, statusTask, osPriorityNormal, 0, 128);
 	osThreadDef(listenModemThread, listenModemTask, osPriorityNormal, 0, 256);
 
 	statusTaskHandle = osThreadCreate(osThread(statusThread), NULL);
 	listenModemTaskHandle = osThreadCreate(osThread(listenModemThread), NULL);
-
-	systemMode = ACTIVE;
-
+	
 	osKernelStart();
 	
+	switchSystemMode(IDLE);
+
 	while (true)
 	{
 	}

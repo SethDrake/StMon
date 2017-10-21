@@ -8,10 +8,10 @@
 
 SSD1306::SSD1306()
 {
-	isSleep = true;
-	isActive = false;
-	font = NULL;
-	i2c = NULL;
+	this->isSleep = true;
+	this->isActive = false;
+	this->font = NULL;
+	this->i2c = NULL;
 }
 
 SSD1306::~SSD1306()

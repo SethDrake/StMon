@@ -23,6 +23,7 @@ template<class ForwardIt>
 typedef enum
 { 
 	LOADING = 0,
+	IDLE,
 	ACTIVE,
 	SLEEP
 } SYSTEM_MODE;

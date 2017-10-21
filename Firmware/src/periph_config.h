@@ -15,7 +15,13 @@
 #define LED_AIR_PIN		GPIO_PIN_1
 
 #define USART_PORT		GPIOA
-#define USART_TX	    GPIO_PIN_9
-#define USART_RX		GPIO_PIN_10
+#define USART_TX	    GPIO_PIN_2
+#define USART_RX		GPIO_PIN_3
+
+#define BAT_CHECK_PORT	GPIOA
+#define BAT_CHECK_PIN	GPIO_PIN_0
+
+#define GSM_PWR_PORT	GPIOA
+#define GSM_PWR_PIN		GPIO_PIN_1
 
 #endif //__PERIPH_CONFIG_H_

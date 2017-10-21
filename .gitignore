@@ -6,3 +6,5 @@ StMon-Debug-Win32.0001
 /Firmware/Debug
 /Firmware/*.old
 /Firmware/StMon.VC.db
+/Firmware/StMon.VC.VC.opendb
+/Firmware/VisualGDBCache/StMon-Debug/MemoryUtilizationReport.xml
