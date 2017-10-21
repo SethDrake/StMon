@@ -5,3 +5,4 @@ StMon-Debug-Win32.0001
 /Firmware/CodeDB/StMon-Debug-Win32
 /Firmware/Debug
 /Firmware/*.old
+/Firmware/StMon.VC.db
