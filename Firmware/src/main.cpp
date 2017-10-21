@@ -6,6 +6,7 @@
 
 //#include "drivers/inc/ssd1306.h"
 //#include "src/drivers/inc/fonts.h"
+#include "drivers/inc/sim900.h"
 #include "periph_config.h"
 #include "objects.h"
 #include "delay.h"
@@ -17,6 +18,7 @@ UART_HandleTypeDef uart;
 I2C_HandleTypeDef i2c;
 
 /*SSD1306 display;*/
+SIM900 gsmModule;
 
 SYSTEM_MODE systemMode;
 bool gsmIsActive;
@@ -227,7 +229,7 @@ void switchSystemMode(SYSTEM_MODE mode)
 	else if(mode == IDLE)
 	{
 		//disable GSM module
-		switchGSM(true);
+		switchGSM(false);
 	}
 	else if(mode == SLEEP)
 	{
@@ -303,7 +305,15 @@ void listenModemTask(void const * argument)
 		if (systemMode == IDLE)
 		{
 			switchSystemMode(ACTIVE); //enable gsm
-			
+			osDelay(5000);
+			if (!gsmModule.initModule(&uart))
+			{
+				switchSystemMode(IDLE);	
+			}
+			else
+			{
+					
+			}
 		}
 		osDelay(60000);
 	}
@@ -338,10 +348,10 @@ int main()
 
 	statusTaskHandle = osThreadCreate(osThread(statusThread), NULL);
 	listenModemTaskHandle = osThreadCreate(osThread(listenModemThread), NULL);
-	
-	osKernelStart();
-	
+
 	switchSystemMode(IDLE);
+
+	osKernelStart();
 
 	while (true)
 	{

@@ -4,6 +4,7 @@
 #include "interrupts.h"
 #include "delay.h"
 #include "objects.h"
+#include "stm32f1xx_hal_usart.h"
 
 
 #ifdef __cplusplus
@@ -97,6 +98,11 @@ void __attribute__((interrupt("IRQ"))) USB_LP_CAN1_RX0_IRQHandler(void)
 void __attribute__((interrupt("IRQ"))) TIM1_UP_IRQHandler(void)
 {
 	//HAL_TIM_IRQHandler(&htim1);	
+}
+	
+void __attribute__((interrupt("IRQ"))) USART2_IRQHandler(void)
+{
+	HAL_UART_IRQHandler(&uart);	
 }
 
 void hard_fault_handler(unsigned int * hardfault_args)

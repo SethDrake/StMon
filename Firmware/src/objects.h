@@ -32,6 +32,7 @@ typedef enum
 extern SYSTEM_MODE systemMode;
 
 extern DMA_HandleTypeDef i2cDmaTx;
+extern UART_HandleTypeDef uart;
 
 /*extern SSD1306 display;*/
 

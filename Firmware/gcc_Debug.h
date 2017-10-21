@@ -1189,7 +1189,6 @@
 //src/freertos/include
 //src/freertos/portable
 //src
-//src/usb
 // --- Include directories end --- //
 
 

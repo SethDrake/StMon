@@ -75,15 +75,19 @@ char* SIM900::getReceivedData()
 }
 
 uint8_t SIM900::sendCommand(char *command) {
-	this->USART_SendBlock((uint8_t*)command, strlen(command));
-	uint8_t buf[1] = "\r";
-	this->USART_SendBlock(buf, 1);
-	return 0;
+	uint8_t len = strlen(command);
+	memset(sim900_txbuf, 0x00, TX_BUFF_SIZE);
+	memcpy(sim900_txbuf, command, len);
+	sim900_txbuf[len] = '\r';
+	HAL_StatusTypeDef result = HAL_UART_Transmit_IT(usart, sim900_txbuf, len+1);
+	return result == HAL_OK;
 }
 
 uint8_t SIM900::waitReceive(char *respStr, uint32_t timeout)
 {
-
+	memset(sim900_rxbuf, 0x00, RX_BUFF_SIZE);
+	uint8_t size = 0;
+	this->USART_ReadBlock((uint8_t*)&sim900_rxbuf, size, timeout);
 }
 
 uint8_t SIM900::sendCommandWithWaitReceive(char *command, char *respStr, uint32_t timeout) {

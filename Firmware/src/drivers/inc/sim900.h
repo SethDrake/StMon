@@ -16,6 +16,7 @@
 #include <stm32f1xx_hal.h>
 
 #define RX_BUFF_SIZE 512
+#define TX_BUFF_SIZE 64
 #define ERROR_STRING "ERROR"
 
 enum RCV_STATUS {
@@ -46,7 +47,8 @@ private:
 	uint8_t isOnline;
 	uint8_t isSleep;
 	uint16_t buf_cnt;
-	char sim900_rxbuff[RX_BUFF_SIZE];
+	char sim900_rxbuf[RX_BUFF_SIZE];
+	uint8_t sim900_txbuf[TX_BUFF_SIZE];
 	char csq[6];
 	char op[16];
 	char imei[32];
