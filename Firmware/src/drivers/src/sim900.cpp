@@ -32,11 +32,12 @@ bool SIM900::initModule(UART_HandleTypeDef* usart)
 {
 	this->usart = usart;
 	sendCommand("AT");
-	if (sendCommandWithWaitReceive("AT+CSCLK=0", "OK", 200) != RS_OK)
+	waitReceive("OK", 10000);
+	if (sendCommandWithWaitReceive("AT+CSCLK=0", "OK", 5000) != RS_OK)
 	{
 		return this->isOnline;		
 	}
-	if (sendCommandWithWaitReceive("AT", "OK", 200) != RS_OK) {
+	if (sendCommandWithWaitReceive("AT", "OK", 5000) != RS_OK) {
 		return this->isOnline;
 	}
 	sendCommand("ATE0");
@@ -75,19 +76,27 @@ char* SIM900::getReceivedData()
 }
 
 uint8_t SIM900::sendCommand(char *command) {
-	uint8_t len = strlen(command);
+	uint16_t len = strlen(command);
 	memset(sim900_txbuf, 0x00, TX_BUFF_SIZE);
 	memcpy(sim900_txbuf, command, len);
 	sim900_txbuf[len] = '\r';
-	HAL_StatusTypeDef result = HAL_UART_Transmit_IT(usart, sim900_txbuf, len+1);
+	HAL_StatusTypeDef result = HAL_UART_Transmit_DMA(usart, sim900_txbuf, len+1);
 	return result == HAL_OK;
 }
 
 uint8_t SIM900::waitReceive(char *respStr, uint32_t timeout)
 {
 	memset(sim900_rxbuf, 0x00, RX_BUFF_SIZE);
-	uint8_t size = 0;
-	this->USART_ReadBlock((uint8_t*)&sim900_rxbuf, size, timeout);
+	uint16_t size = strlen(respStr);
+	HAL_StatusTypeDef status = HAL_UART_Receive(usart, (uint8_t*)&sim900_rxbuf, size, timeout);
+	if (status == HAL_OK)
+	{
+		if (strcmp(respStr, sim900_rxbuf) == 0)
+		{
+			return RS_OK;	
+		}	
+	}
+	return RS_ERROR;
 }
 
 uint8_t SIM900::sendCommandWithWaitReceive(char *command, char *respStr, uint32_t timeout) {
@@ -98,14 +107,14 @@ uint8_t SIM900::sendCommandWithWaitReceive(char *command, char *respStr, uint32_
 
 void SIM900::identifyModule() {
 	std::fill_n(imei, 32, 0x00);
-	if (sendCommandWithWaitReceive("AT+GSN", "OK", 200) == RS_OK) {
+	if (sendCommandWithWaitReceive("AT+GSN", "OK", 1000) == RS_OK) {
 		strcpy(imei, strtok(getReceivedData(), "\r\n"));
 	}
 }
 
 void SIM900::readCSQ() {
 	std::fill_n(csq, 16, 0x00);
-	if (sendCommandWithWaitReceive("AT+CSQ", "OK", 200) == RS_OK) {
+	if (sendCommandWithWaitReceive("AT+CSQ", "OK", 1000) == RS_OK) {
 		char *csqStr = strtok(getReceivedData(), "\r\n");
 //		char *csq = strrchr(' ', csqStr);
 //		strcpy(this->csq = atoi(strtok(csq, ",")));
@@ -114,7 +123,7 @@ void SIM900::readCSQ() {
 
 void SIM900::USART_SendBlock(uint8_t* data, uint8_t size) 
 {
-	HAL_UART_Transmit(usart, data, size, 5000);
+	//HAL_UART_Transmit(usart, data, size, 5000);
 }
 
 uint8_t SIM900::USART_ReadByte(bool* isOk, uint16_t timeout) 
@@ -165,18 +174,20 @@ uint8_t SIM900::USART_ReadByte(bool* isOk, uint16_t timeout)
 	return result;
 }
 
-bool SIM900::USART_ReadBlock(uint8_t* data, uint8_t size, uint16_t timeout) 
+uint8_t SIM900::USART_ReadBlock(uint8_t* data, uint8_t size, uint16_t timeout) 
 {
+	uint8_t cnt = 0;
 	bool isOk = true;
 	for (int i = 0; i < size; i++)
 	{
 		data[i] = USART_ReadByte(&isOk, timeout);
 		if (!isOk)
 		{
-			return false;
+			return cnt;
 		}
+		cnt++;
 	}
-	return true;
+	return cnt;
 }
 
 bool SIM900::USART_ReadFixedBlock(uint8_t* data, uint8_t size, uint16_t timeout) 

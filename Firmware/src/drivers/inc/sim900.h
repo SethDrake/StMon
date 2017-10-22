@@ -54,7 +54,7 @@ private:
 	char imei[32];
 	void USART_SendBlock(uint8_t* data, uint8_t size);
 	uint8_t USART_ReadByte(bool* isOk, uint16_t timeout); 
-	bool USART_ReadBlock(uint8_t* data, uint8_t size, uint16_t timeout);
+	uint8_t USART_ReadBlock(uint8_t* data, uint8_t size, uint16_t timeout);
 	bool USART_ReadFixedBlock(uint8_t* data, uint8_t size, uint16_t timeout); 
 };
 

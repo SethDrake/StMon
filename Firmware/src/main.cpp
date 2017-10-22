@@ -1,5 +1,5 @@
 #include <sys/_stdint.h>
-
+#include <string.h>
 #include <stm32f1xx_hal.h>
 
 #include "cmsis_os.h"
@@ -10,12 +10,13 @@
 #include "periph_config.h"
 #include "objects.h"
 #include "delay.h"
-#include <cerrno>
-#include "stm32f1xx_ll_i2c.h"
 
-DMA_HandleTypeDef i2cDmaTx;
+DMA_HandleTypeDef uartDmaRx;
+DMA_HandleTypeDef uartDmaTx;
 UART_HandleTypeDef uart;
 I2C_HandleTypeDef i2c;
+
+uint8_t rcvBuffer[512];
 
 /*SSD1306 display;*/
 SIM900 gsmModule;
@@ -106,7 +107,7 @@ void RCC_Configuration()
 void I2C_Configuration(I2C_HandleTypeDef* i2cHandle)
 {
 	i2cHandle->Instance             = I2C1;
-	i2cHandle->Init.ClockSpeed      = LL_I2C_MAX_SPEED_FAST; //400000
+	i2cHandle->Init.ClockSpeed      = 400000;
 	i2cHandle->Init.DutyCycle       = I2C_DUTYCYCLE_2;
 	i2cHandle->Init.OwnAddress1     = 0x00;
 	i2cHandle->Init.AddressingMode  = I2C_ADDRESSINGMODE_7BIT;
@@ -138,16 +139,33 @@ void USART_Configuration(UART_HandleTypeDef* usartHandle)
 	__HAL_UART_ENABLE(usartHandle);
 }
 
-void DMA_I2C_TX_Configuration(DMA_HandleTypeDef* dmaHandle)
+
+void DMA_USART2_RX_Configuration(DMA_HandleTypeDef* dmaHandle)
 {
 	dmaHandle->Instance                 = DMA1_Channel6;
+	dmaHandle->Init.Direction           = DMA_PERIPH_TO_MEMORY;
+	dmaHandle->Init.PeriphInc           = DMA_PINC_DISABLE;
+	dmaHandle->Init.MemInc              = DMA_MINC_ENABLE;
+	dmaHandle->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+	dmaHandle->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+	dmaHandle->Init.Mode                = DMA_NORMAL;
+	dmaHandle->Init.Priority            = DMA_PRIORITY_MEDIUM;
+	if (HAL_DMA_Init(dmaHandle) != HAL_OK)
+	{
+		errorHandler();
+	}
+}
+
+void DMA_USART2_TX_Configuration(DMA_HandleTypeDef* dmaHandle)
+{
+	dmaHandle->Instance                 = DMA1_Channel7;
 	dmaHandle->Init.Direction           = DMA_MEMORY_TO_PERIPH;
 	dmaHandle->Init.PeriphInc           = DMA_PINC_DISABLE;
 	dmaHandle->Init.MemInc              = DMA_MINC_ENABLE;
 	dmaHandle->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
 	dmaHandle->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
 	dmaHandle->Init.Mode                = DMA_NORMAL;
-	dmaHandle->Init.Priority            = DMA_PRIORITY_VERY_HIGH;
+	dmaHandle->Init.Priority            = DMA_PRIORITY_MEDIUM;
 	if (HAL_DMA_Init(dmaHandle) != HAL_OK)
 	{
 		errorHandler();
@@ -209,8 +227,14 @@ void NVIC_Configuration(void) {
 	/* SysTick_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(SysTick_IRQn, 14, 0);
 
-	HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 15, 0);
-	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+	HAL_NVIC_SetPriority(USART2_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(USART2_IRQn);
+
+	HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 5, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+
+	/*HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 15, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);*/
 }
 
 
@@ -247,13 +271,13 @@ void switchGSM(bool enable)
 	if (gsmIsActive)
 	{
 		//switch on gsm
-		HAL_GPIO_WritePin(GSM_PWR_PORT, GSM_PWR_PIN, GPIO_PIN_SET);
+		//HAL_GPIO_WritePin(GSM_PWR_PORT, GSM_PWR_PIN, GPIO_PIN_SET); - always powered up
 		HAL_GPIO_WritePin(LEDS_PORT, LED_AIR_PIN, GPIO_PIN_SET);
 	}
 	else 
 	{
 		//switch off gsm
-		HAL_GPIO_WritePin(GSM_PWR_PORT, GSM_PWR_PIN, GPIO_PIN_RESET);
+		//HAL_GPIO_WritePin(GSM_PWR_PORT, GSM_PWR_PIN, GPIO_PIN_RESET); - always powered up
 		HAL_GPIO_WritePin(LEDS_PORT, LED_AIR_PIN, GPIO_PIN_RESET);
 	}
 }
@@ -304,16 +328,25 @@ void listenModemTask(void const * argument)
 	{
 		if (systemMode == IDLE)
 		{
+			uint8_t cmd[10];
 			switchSystemMode(ACTIVE); //enable gsm
-			osDelay(5000);
-			if (!gsmModule.initModule(&uart))
+			osDelay(500);
+			memcpy(&cmd, "AT\r", 3);
+			HAL_StatusTypeDef result = HAL_UART_Transmit_DMA(&uart, cmd, 3);
+			memset(rcvBuffer, 0x00, 512);
+			HAL_StatusTypeDef status = HAL_UART_Receive(&uart, rcvBuffer, 512, 5000);
+			osDelay(1000);
+			switchSystemMode(IDLE);	
+			
+			
+			/*if (!gsmModule.initModule(&uart))
 			{
 				switchSystemMode(IDLE);	
 			}
 			else
 			{
 					
-			}
+			}*/
 		}
 		osDelay(60000);
 	}
@@ -331,7 +364,11 @@ int main()
 	NVIC_Configuration();
 	I2C_Configuration(&i2c);
 	USART_Configuration(&uart);
-	DMA_I2C_TX_Configuration(&i2cDmaTx);
+	//DMA_USART2_RX_Configuration(&uartDmaRx);
+	DMA_USART2_TX_Configuration(&uartDmaTx);
+
+	//__HAL_LINKDMA(&uart, hdmarx, uartDmaRx);
+	__HAL_LINKDMA(&uart, hdmatx, uartDmaTx);
 
 	systemMode = LOADING;
 

@@ -87,7 +87,12 @@ void __attribute__((interrupt("IRQ"))) SysTick_Handler(void) {
 
 void __attribute__((interrupt("IRQ"))) DMA1_Channel6_IRQHandler(void)
 {
-	HAL_DMA_IRQHandler(&i2cDmaTx);
+	//HAL_DMA_IRQHandler(&uartDmaRx);
+}
+
+void __attribute__((interrupt("IRQ"))) DMA1_Channel7_IRQHandler(void)
+{
+	HAL_DMA_IRQHandler(&uartDmaTx);
 }
 
 void __attribute__((interrupt("IRQ"))) USB_LP_CAN1_RX0_IRQHandler(void)
